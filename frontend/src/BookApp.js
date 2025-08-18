@@ -1,0 +1,327 @@
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { jwtDecode } from "jwt-decode"; // To decode JWT for username
+
+function BookAppointment() {
+  const navigate = useNavigate();
+  const [patientId, setPatientId] = useState(""); // This will be set from the fetched user details
+  const [doctorId, setDoctorId] = useState("");
+  const [reason, setReason] = useState("");
+  const [appointmentDate, setAppointmentDate] = useState("");
+  const [appointmentTime, setAppointmentTime] = useState("");
+  const [doctors, setDoctors] = useState([]); // To fetch and list available doctors
+  const [loading, setLoading] = useState(true); // Loading state for data fetching
+  const [error, setError] = useState(null); // Error state for data fetching
+
+  useEffect(() => {
+    const token = localStorage.getItem("jwt");
+    if (!token) {
+      alert("You are not logged in. Please log in to book an appointment.");
+      navigate("/login"); // Redirect if no token
+      return;
+    }
+
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const decoded = jwtDecode(token);
+        const username = decoded.sub; // Correctly get username from JWT
+
+        // 1. Fetch current user's details to get their MongoDB _id
+        // Using the correct endpoint and 'username' variable
+        const userRes = await fetch(`http://localhost:7000/user/username/${username}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`, // Send JWT for authentication
+          },
+        });
+
+        if (!userRes.ok) {
+          const errorText = await userRes.text();
+          throw new Error(`Failed to fetch current user details: ${userRes.status} - ${errorText}`);
+        }
+        const userData = await userRes.json();
+        setPatientId(userData.id); // Set the patient's MongoDB '_id' from the response
+
+        // 2. Fetch list of all users and filter for doctors
+        const doctorsRes = await fetch("http://localhost:7000/user/all", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`, // Send JWT for authentication
+          },
+        });
+
+        if (!doctorsRes.ok) {
+          const errorText = await doctorsRes.text();
+          throw new Error(`Failed to fetch doctors list: ${doctorsRes.status} - ${errorText}`);
+        }
+        const allUsers = await doctorsRes.json();
+        // Filter for users with 'DOCTOR' role (ensure this matches your Java enum value exactly, e.g., "DOCTOR" not "ROLE_DOCTOR")
+        const doctorList = allUsers.filter(user => user.role === "DOCTOR");
+        setDoctors(doctorList);
+
+      } catch (err) {
+        console.error("Error during initial data fetch:", err);
+        setError(err.message);
+        alert("Failed to load necessary data for booking: " + err.message + ". Please try again or log in.");
+        navigate("/patient/home"); // Go back if initial fetch fails
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [navigate]); // navigate is a dependency of useEffect
+
+  const handleBookAppointment = async () => {
+    // Basic client-side validation
+    if (!patientId || !doctorId || !reason || !appointmentDate || !appointmentTime) {
+      alert("Please fill in all fields before booking the appointment.");
+      return;
+    }
+
+    const token = localStorage.getItem("jwt");
+    if (!token) {
+      alert("Authentication token missing. Please log in again.");
+      navigate("/login");
+      return;
+    }
+
+    // Construct the appointment object, ensuring date and time formats match backend's @Pattern
+    const newAppointment = {
+      patientId,
+      doctorId,
+      reason,
+      appointmentDate, // Format: YYYY-MM-DD (e.g., "2025-08-15")
+      appointmentTime, // Format: HH:MM (e.g., "14:30")
+      status: "PENDING", // Default status for a newly booked appointment
+    };
+
+    try {
+      // Send the POST request to your backend to create the appointment
+      const res = await fetch("http://localhost:7000/appointment", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`, // Include the JWT token in the Authorization header
+        },
+        body: JSON.stringify(newAppointment),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json(); // Attempt to read specific error messages from backend
+        throw new Error(errorData.message || "Failed to book appointment. Please check your inputs.");
+      }
+
+      alert("Appointment booked successfully! You will receive a notification shortly.");
+      navigate("/appointments"); // Redirect to the appointments list page after successful booking
+    } catch (err) {
+      console.error("Error booking appointment:", err);
+      alert("Error booking appointment: " + err.message);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={styles.loadingContainer}>
+        <div style={styles.spinner}></div>
+        <p>Loading doctors and your details...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={styles.errorContainer}>
+        <h2>Error Loading Data</h2>
+        <p>{error}</p>
+        <button onClick={() => navigate("/patient/home")} style={styles.errorButton}>Go to Dashboard</button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.container}>
+      <h1 style={styles.title}>Book New Appointment</h1>
+      <div style={styles.form}>
+        <h2 style={styles.formTitle}>Appointment Details</h2>
+
+        <label style={styles.label}>
+          Select Doctor:
+          <select
+            style={styles.input}
+            value={doctorId}
+            onChange={(e) => setDoctorId(e.target.value)}
+            required
+          >
+            <option value="">-- Select a Doctor --</option>
+            {doctors.length > 0 ? (
+              doctors.map((doc) => (
+                <option key={doc.id} value={doc.id}>
+                  {doc.username}
+                </option>
+              ))
+            ) : (
+              <option value="" disabled>No doctors available</option>
+            )}
+          </select>
+        </label>
+
+        <label style={styles.label}>
+          Reason for Appointment:
+          <input
+            type="text"
+            style={styles.input}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g., General check-up, Fever"
+            required
+          />
+        </label>
+
+        <label style={styles.label}>
+          Appointment Date:
+          <input
+            type="date"
+            style={styles.input}
+            value={appointmentDate}
+            onChange={(e) => setAppointmentDate(e.target.value)}
+            required
+          />
+        </label>
+
+        <label style={styles.label}>
+          Appointment Time:
+          <input
+            type="time"
+            style={styles.input}
+            value={appointmentTime}
+            onChange={(e) => setAppointmentTime(e.target.value)}
+            required
+          />
+        </label>
+
+        <button onClick={handleBookAppointment} style={styles.button}>
+          Book Appointment
+        </button>
+        <button onClick={() => navigate(-1)} style={{...styles.button, backgroundColor: '#6c757d', marginLeft: '10px'}}>
+            Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const styles = {
+  container: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    padding: "40px",
+    fontFamily: "Arial, sans-serif",
+    backgroundColor: "#DEF2F1",
+    minHeight: "100vh",
+  },
+  title: {
+    fontSize: "2.5rem",
+    marginBottom: "20px",
+    color: "#2B7A78",
+  },
+  form: {
+    background: "#fff",
+    padding: "30px",
+    borderRadius: "15px",
+    boxShadow: "0 6px 15px rgba(0,0,0,0.15)",
+    width: "100%",
+    maxWidth: "500px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "15px",
+  },
+  formTitle: {
+    fontSize: "1.8rem",
+    color: "#3Aafa9",
+    marginBottom: "20px",
+    textAlign: "center",
+  },
+  label: {
+    fontSize: "1rem",
+    color: "#17252A",
+    display: "flex",
+    flexDirection: "column",
+    gap: "5px",
+  },
+  input: {
+    padding: "12px",
+    borderRadius: "8px",
+    border: "1px solid #ccc",
+    fontSize: "1rem",
+    width: "calc(100% - 24px)", // Adjust for padding
+  },
+  button: {
+    padding: "12px 25px",
+    backgroundColor: "#3Aafa9",
+    border: "none",
+    color: "white",
+    cursor: "pointer",
+    borderRadius: "8px",
+    fontSize: "1.1rem",
+    fontWeight: "bold",
+    marginTop: "20px",
+    transition: "background-color 0.2s ease",
+    "&:hover": {
+      backgroundColor: "#2B7A78",
+    },
+  },
+  loadingContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    backgroundColor: '#DEF2F1',
+    fontSize: '1.5rem',
+    color: '#2B7A78',
+  },
+  errorContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    backgroundColor: '#F8D7DA', // Light red background for error
+    color: '#721C24', // Dark red text
+    padding: '20px',
+    borderRadius: '10px',
+    textAlign: 'center',
+    boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+  },
+  errorButton: {
+    marginTop: '20px',
+    padding: '10px 20px',
+    backgroundColor: '#DC3545', // Red button
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    fontSize: '1rem',
+  },
+  spinner: {
+    border: '4px solid rgba(0, 0, 0, 0.1)',
+    width: '36px',
+    height: '36px',
+    borderRadius: '50%',
+    borderLeftColor: '#2B7A78',
+    animation: 'spin 1s ease infinite',
+    marginBottom: '15px',
+  },
+  '@keyframes spin': {
+    '0%': { transform: 'rotate(0deg)' },
+    '100%': { transform: 'rotate(360deg)' },
+  },
+};
+
+export default BookAppointment;
