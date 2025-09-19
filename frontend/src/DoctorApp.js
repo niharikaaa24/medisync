@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -13,54 +12,53 @@ function DoctorApp() {
   const [isEditing, setIsEditing] = useState(false);
   const [newStatus, setNewStatus] = useState("");
 
-  // Define possible appointment statuses (should match your Java Status enum values)
-  const appointmentStatuses = ["PENDING", "CONFIRMED", "CANCELED", "COMPLETED"];
+  const appointmentStatuses = ["PENDING", "CONFIRMED", "CANCELLED", "SUCCESS"];
+
+  const fetchDoctorAppointments = async () => {
+    setLoading(true);
+    setMainError(null);
+    const token = localStorage.getItem("jwt");
+
+    if (!token) {
+      setMainError("Authentication required. Please log in.");
+      setLoading(false);
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const res = await fetch("http://localhost:7070/appointment/doctor", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Failed to fetch appointments: ${res.status} - ${errorText}`);
+      }
+
+      const data = await res.json();
+      setAppointments(data);
+    } catch (err) {
+      console.error("Error fetching doctor appointments:", err);
+      setMainError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchDoctorAppointments = async () => {
-      setLoading(true);
-      setMainError(null);
-      const token = localStorage.getItem("jwt");
-
-      if (!token) {
-        setMainError("Authentication required. Please log in.");
-        setLoading(false);
-        navigate("/login");
-        return;
-      }
-
-      try {
-        const res = await fetch("http://localhost:7000/appointment/doctor", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(`Failed to fetch appointments: ${res.status} - ${errorText}`);
-        }
-
-        const data = await res.json();
-        setAppointments(data);
-      } catch (err) {
-        console.error("Error fetching doctor appointments:", err);
-        setMainError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchDoctorAppointments();
   }, [navigate]);
 
   const handleViewDetails = async (id) => {
     setDetailLoading(true);
-    setSelectedAppointment(null); // Clear previously selected appointment
+    setSelectedAppointment(null);
     setDetailError(null);
-    setIsEditing(false); // Close edit mode when viewing new details
+    setIsEditing(false);
     const token = localStorage.getItem("jwt");
 
     if (!token) {
@@ -71,7 +69,7 @@ function DoctorApp() {
     }
 
     try {
-      const res = await fetch(`http://localhost:7000/appointment/${id}`, {
+      const res = await fetch(`http://localhost:7070/appointment/${id}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -87,7 +85,7 @@ function DoctorApp() {
       const data = await res.json();
       if (data) {
         setSelectedAppointment(data);
-        setNewStatus(data.status); // Set initial status for editing
+        setNewStatus(data.status);
       } else {
         setDetailError("Appointment details not found.");
       }
@@ -112,14 +110,14 @@ function DoctorApp() {
       return;
     }
 
-    // Create a copy of the selected appointment and update only the status
+    // FIX: Create a complete updatedAppointment object with the new status
     const updatedAppointment = {
       ...selectedAppointment,
       status: newStatus,
     };
 
     try {
-      const res = await fetch(`http://localhost:7000/appointment/${selectedAppointment.id}`, {
+      const res = await fetch(`http://localhost:7070/appointment/${selectedAppointment.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -133,24 +131,12 @@ function DoctorApp() {
         throw new Error(errorData.message || "Failed to update appointment status.");
       }
 
-      const updatedData = await res.json(); // Get the updated appointment from backend
+      const updatedData = await res.json();
       alert("Appointment status updated successfully!");
-      setSelectedAppointment(updatedData); // Update selected appointment with fresh data
-      setIsEditing(false); // Exit edit mode
+      setSelectedAppointment(updatedData);
+      setIsEditing(false);
 
-      // Optionally, refetch all appointments to update the list in the main view
-      const updatedListRes = await fetch("http://localhost:7000/appointment/doctor", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-      });
-      if (updatedListRes.ok) {
-        const updatedListData = await updatedListRes.json();
-        setAppointments(updatedListData);
-      }
-
+      fetchDoctorAppointments();
     } catch (err) {
       console.error("Error updating appointment status:", err);
       alert("Error updating status: " + err.message);
@@ -189,7 +175,7 @@ function DoctorApp() {
         <div style={styles.appointmentsList}>
           {appointments.map((app) => (
             <div
-              key={app.id || app._id} // Use app.id or app._id for key
+              key={app.id || app._id}
               style={styles.appointmentCard}
               onClick={() => handleViewDetails(app.id || app._id)}
             >
@@ -286,7 +272,7 @@ const styles = {
   container: {
     padding: "40px",
     fontFamily: "Arial, sans-serif",
-    backgroundColor: "#E3F2FD", // Light blue background
+    backgroundColor: "#E3F2FD",
     minHeight: "100vh",
     display: "flex",
     flexDirection: "column",
@@ -296,11 +282,11 @@ const styles = {
   title: {
     fontSize: "2.5rem",
     marginBottom: "20px",
-    color: "#1976D2", // Deep blue
+    color: "#1976D2",
     textAlign: "center",
   },
   backButton: {
-    backgroundColor: "#2196F3", // Blue
+    backgroundColor: "#2196F3",
     color: "white",
     padding: "10px 20px",
     borderRadius: "8px",
@@ -340,7 +326,7 @@ const styles = {
     display: "block",
     marginTop: "10px",
     textAlign: "right",
-    color: "#0D47A1", // Darker blue for link-like text
+    color: "#0D47A1",
     fontWeight: "bold",
   },
   noAppointments: {
@@ -354,7 +340,7 @@ const styles = {
     padding: "20px",
     border: "1px solid #2196F3",
     borderRadius: "8px",
-    backgroundColor: "#EBF5FF", // Lighter blue background for details
+    backgroundColor: "#EBF5FF",
     width: "100%",
     maxWidth: "700px",
     boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
@@ -373,7 +359,7 @@ const styles = {
     color: "#555",
   },
   editButton: {
-    backgroundColor: "#FFC107", // Amber for edit
+    backgroundColor: "#FFC107",
     color: "black",
     padding: "8px 15px",
     borderRadius: "5px",
@@ -403,7 +389,7 @@ const styles = {
     fontSize: "1rem",
   },
   saveButton: {
-    backgroundColor: "#4CAF50", // Green for save
+    backgroundColor: "#4CAF50",
     color: "white",
     padding: "8px 15px",
     borderRadius: "5px",
@@ -416,7 +402,7 @@ const styles = {
     },
   },
   cancelButton: {
-    backgroundColor: "#F44336", // Red for cancel
+    backgroundColor: "#F44336",
     color: "white",
     padding: "8px 15px",
     borderRadius: "5px",

@@ -7,5 +7,5 @@ import java.util.List;
 
 public interface NotificationRepo extends MongoRepository<Notification, String> {
 
-    List<Notification> findByUserId(String username);
+    List<Notification> findByRecipientIdOrderByTimestampDesc(String recipientId);
 }

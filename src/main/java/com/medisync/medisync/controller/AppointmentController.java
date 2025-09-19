@@ -1,11 +1,10 @@
-
 package com.medisync.medisync.controller;
-
 import com.medisync.medisync.entity.Appointment;
+import com.medisync.medisync.entity.Status;
 import com.medisync.medisync.service.AppointmentService;
-import com.medisync.medisync.service.NotificationService;
 import com.medisync.medisync.service.UserService;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,59 +13,50 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.validation.FieldError;
+import com.medisync.medisync.dto.PaymentResponse;
+import com.medisync.medisync.dto.PaymentRequest;
+import org.springframework.web.client.RestTemplate;
 import com.medisync.medisync.entity.User;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
+import java.math.BigDecimal;
+import java.util.*;
+import com.medisync.medisync.service.NotificationService;
 
 @RestController
 @RequestMapping("/appointment")
+@Slf4j
 public class AppointmentController {
 
-    @Autowired
-    private AppointmentService appointmentService;
+    private final AppointmentService appointmentService;
+    private final UserService userService;
+    private final NotificationService notificationService;
+    private final RestTemplate restTemplate;
+
+    private final String PAYMENT_SERVICE_URL = "http://localhost:8000/api/payments";
 
     @Autowired
-    private NotificationService notificationService;
-
-    @Autowired
-    private UserService userService;
-
-
-
-    @CrossOrigin(origins = "http://localhost:3000")
-    @GetMapping("/all")
-    public ResponseEntity getAllApp()
-    {
-        List<Appointment> appointments= appointmentService.findAllApp();
-
-        if(appointments!=null) {
-            return new ResponseEntity(appointments, HttpStatus.ACCEPTED);
-        }
-        else
-            return new ResponseEntity(HttpStatus.NOT_FOUND);
-
+    public AppointmentController(AppointmentService appointmentService, UserService userService, NotificationService notificationService, RestTemplate restTemplate) {
+        this.appointmentService = appointmentService;
+        this.userService = userService;
+        this.notificationService = notificationService;
+        this.restTemplate = restTemplate;
     }
 
-    @CrossOrigin(origins = "http://localhost:3000")
+    @GetMapping("/all")
+    public ResponseEntity<List<Appointment>> getAllApp() {
+        List<Appointment> appointments = appointmentService.findAllApp();
+        return new ResponseEntity<>(appointments, HttpStatus.OK);
+    }
+
     @GetMapping("/{id}")
-    public ResponseEntity<Optional<Appointment>> getAppById(@PathVariable String id)
-    {
-        try
-        {
-            Optional<Appointment> appointment= appointmentService.findAppById(id);
-            return new ResponseEntity<>(appointment, HttpStatus.ACCEPTED);
-        }
-        catch(Exception e)
-        {
+    public ResponseEntity<Optional<Appointment>> getAppById(@PathVariable String id) {
+        Optional<Appointment> appointment = appointmentService.findAppById(id);
+        if (appointment.isPresent()) {
+            return new ResponseEntity<>(appointment, HttpStatus.OK);
+        } else {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
 
-    @CrossOrigin(origins = "http://localhost:3000")
     @GetMapping("/patient")
     public ResponseEntity<List<Appointment>> getPatientAppointments() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -74,7 +64,6 @@ public class AppointmentController {
         return ResponseEntity.ok(appointmentService.getAppointmentsForPatient(username));
     }
 
-    @CrossOrigin(origins = "http://localhost:3000")
     @GetMapping("/doctor")
     public ResponseEntity<List<Appointment>> getDoctorAppointments() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -85,72 +74,55 @@ public class AppointmentController {
     @PostMapping
     public ResponseEntity<?> createApp(@Valid @RequestBody Appointment appointment) {
         try {
-            appointmentService.saveApp(appointment);
+            appointment.setStatus(Status.PENDING);
+            Appointment savedAppointment = appointmentService.saveApp(appointment); // Notifications are now handled in the service
 
-            String patientId = appointment.getPatientId();
-            String doctorId = appointment.getDoctorId();
-            String appointmentDateTime = appointment.getAppointmentDate() + " at " + appointment.getAppointmentTime();
+            String doctorName = userService.findUserById(savedAppointment.getDoctorId()).map(User::getUsername).orElse("Unknown Doctor");
 
-            String doctorName = userService.findUserById(doctorId)
-                    .map(User::getUsername)
-                    .orElse("Unknown Doctor");
+            PaymentRequest productRequest = new PaymentRequest();
+            productRequest.setName("Appointment with Dr. " + doctorName);
+            productRequest.setAmount(BigDecimal.valueOf(1000L));
+            productRequest.setCurrency("INR");
+            productRequest.setAppointmentId(savedAppointment.getId());
+            productRequest.setPatientId(savedAppointment.getPatientId());
+            productRequest.setDoctorId(savedAppointment.getDoctorId());
+            productRequest.setSuccessUrl("http://localhost:3000/payment-success");
+            productRequest.setCancelUrl("http://localhost:3000/appointments");
 
-            String patientName = userService.findUserById(patientId)
-                    .map(User::getUsername)
-                    .orElse("Unknown Patient");
+            ResponseEntity<PaymentResponse> paymentResponseEntity = restTemplate.postForEntity(
+                    PAYMENT_SERVICE_URL + "/checkout",
+                    productRequest,
+                    PaymentResponse.class
+            );
 
-            notificationService.sendNotification(patientId,
-                    "Your appointment with Doctor " + doctorName +
-                            " is booked for " + appointmentDateTime + " (Status: " + appointment.getStatus() + ").");
-
-            notificationService.sendNotification(doctorId,
-                    "You have a new appointment with Patient " + patientName +
-                            " on " + appointmentDateTime + " (Status: " + appointment.getStatus() + ").");
-
-            System.out.println("Notifications sent for new appointment: Patient " + patientId + ", Doctor " + doctorId);
-
-            return new ResponseEntity<>(HttpStatus.CREATED);
+            if (paymentResponseEntity.getStatusCode() == HttpStatus.OK && paymentResponseEntity.getBody() != null) {
+                PaymentResponse paymentResponse = paymentResponseEntity.getBody();
+                return new ResponseEntity<>(paymentResponse, HttpStatus.OK);
+            } else {
+                savedAppointment.setStatus(Status.CANCELLED);
+                appointmentService.saveApp(savedAppointment);
+                log.error("Failed to initiate payment. Status: {}", paymentResponseEntity.getStatusCode());
+                return new ResponseEntity<>("Failed to initiate payment.", HttpStatus.INTERNAL_SERVER_ERROR);
+            }
         } catch (Exception e) {
-            System.err.println("Error creating appointment: " + e.getMessage());
-            return new ResponseEntity<>("Error creating appointment: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+            log.error("Error creating appointment or initiating payment: {}", e.getMessage(), e);
+            Map<String, String> errorResponse = Collections.singletonMap("message", "Error creating appointment: " + e.getMessage());
+            return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
         }
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity deleteApp(@PathVariable String id)
-    {
-        try
-        {
+    public ResponseEntity deleteApp(@PathVariable String id) {
+        try {
             Optional<Appointment> appointmentToDeleteOpt = appointmentService.findAppById(id);
             if (appointmentToDeleteOpt.isPresent()) {
-                Appointment appointmentToDelete = appointmentToDeleteOpt.get();
-                appointmentService.deleteAppById(id);
-
-                String patientId = appointmentToDelete.getPatientId();
-                String doctorId = appointmentToDelete.getDoctorId();
-                String appointmentDateTime = appointmentToDelete.getAppointmentDate() + " at " + appointmentToDelete.getAppointmentTime();
-
-                if (notificationService != null && userService != null) {
-                    notificationService.sendNotification(patientId, "Your appointment with Doctor " +
-                            userService.findUserById(doctorId).orElse(null) +
-                            " on " + appointmentDateTime + " has been CANCELLED.");
-
-                    notificationService.sendNotification(doctorId, "The appointment with Patient " +
-                            userService.findUserById(patientId).orElse(null) +
-                            " on " + appointmentDateTime + " has been CANCELLED.");
-
-                    System.out.println("Notifications sent for deleted appointment: Patient " + patientId + ", Doctor " + doctorId);
-                } else {
-                    System.err.println("NotificationService or UserService is null. Cannot send notification for deleted appointment.");
-                }
+                appointmentService.deleteAppById(id); // The service should handle notifications
+                return new ResponseEntity(HttpStatus.OK);
             } else {
                 return new ResponseEntity(HttpStatus.NOT_FOUND);
             }
-            return new ResponseEntity(HttpStatus.OK);
-        }
-        catch(Exception e)
-        {
-            System.err.println("Error deleting appointment: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("Error deleting appointment with ID {}: {}", id, e.getMessage(), e);
             return new ResponseEntity(HttpStatus.BAD_REQUEST);
         }
     }
@@ -161,9 +133,6 @@ public class AppointmentController {
 
         if (existingAppointmentOpt.isPresent()) {
             Appointment existingAppointment = existingAppointmentOpt.get();
-
-            String oldStatus = existingAppointment.getStatus().name();
-            String oldAppointmentDateTime = existingAppointment.getAppointmentDate() + " at " + existingAppointment.getAppointmentTime();
 
             if (updatedAppointment.getAppointmentDate() != null && !updatedAppointment.getAppointmentDate().isBlank()) {
                 existingAppointment.setAppointmentDate(updatedAppointment.getAppointmentDate());
@@ -184,30 +153,7 @@ public class AppointmentController {
                 existingAppointment.setPatientId(updatedAppointment.getPatientId());
             }
 
-            Appointment savedAppointment = appointmentService.saveApp(existingAppointment);
-
-            String patientId = savedAppointment.getPatientId();
-            String doctorId = savedAppointment.getDoctorId();
-            String newAppointmentDateTime = savedAppointment.getAppointmentDate() + " at " + savedAppointment.getAppointmentTime();
-            String newStatus = savedAppointment.getStatus().name();
-
-            if (notificationService != null && userService != null) {
-
-                notificationService.sendNotification(patientId,
-                        "Your appointment with Doctor " + userService.findUserById(doctorId).orElse(null) +
-                                " has been updated. Old details: " + oldAppointmentDateTime + " (Status: " + oldStatus +
-                                "). New details: " + newAppointmentDateTime + " (Status: " + newStatus + ").");
-
-                notificationService.sendNotification(doctorId,
-                        "The appointment with Patient " + userService.findUserById(patientId).orElse(null) +
-                                " has been updated. Old details: " + oldAppointmentDateTime + " (Status: " + oldStatus +
-                                "). New details: " + newAppointmentDateTime + " (Status: " + newStatus + ").");
-
-                System.out.println("Notifications sent for updated appointment: Patient " + patientId + ", Doctor " + doctorId);
-            } else {
-                System.err.println("NotificationService or UserService is null. Cannot send notification for updated appointment.");
-            }
-
+            Appointment savedAppointment = appointmentService.saveApp(existingAppointment); // Notifications are now handled in the service
             return new ResponseEntity<>(savedAppointment, HttpStatus.OK);
         } else {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);

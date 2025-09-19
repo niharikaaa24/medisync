@@ -1,6 +1,6 @@
-package com.medisync.medisync.entity; // Assuming this is where CustomUserDetails is located
+package com.medisync.medisync.entity;
 
-import com.medisync.medisync.entity.User; // Import your User entity
+import com.medisync.medisync.entity.User;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -12,23 +12,23 @@ public class CustomUserDetails implements UserDetails {
     private String id;
     private String username;
     private String password;
-    private Collection<? extends GrantedAuthority> authorities; // Changed to Collection type
+    private Collection<? extends GrantedAuthority> authorities;
 
 
     public CustomUserDetails(User user, Collection<? extends GrantedAuthority> authorities) {
         this.id = user.getId();
         this.username = user.getUsername();
         this.password = user.getPassword();
-        this.authorities = authorities; // Initialize authorities here
+        this.authorities = authorities;
     }
 
     public CustomUserDetails(Optional<User> userOptional, Collection<? extends GrantedAuthority> authorities) {
         if (userOptional.isPresent()) {
-            User user = userOptional.get(); // Unwrap the Optional
+            User user = userOptional.get();
             this.id = user.getId();
             this.username = user.getUsername();
             this.password = user.getPassword();
-            this.authorities = authorities; // Initialize authorities here
+            this.authorities = authorities;
         } else {
             throw new IllegalArgumentException("User Optional cannot be empty for CustomUserDetails.");
         }

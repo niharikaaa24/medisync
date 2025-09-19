@@ -23,7 +23,7 @@ function ManageAppointments() {
 
     try {
       // Fetch all appointments
-      const appRes = await fetch("http://localhost:7000/appointment/all", {
+      const appRes = await fetch("http://localhost:7070/appointment/all", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -53,7 +53,7 @@ function ManageAppointments() {
         idArray.map(async (id) => {
           try {
             // Use the /user/{id} endpoint to get user details by ID
-            const userRes = await fetch(`http://localhost:7000/user/${id}`, {
+            const userRes = await fetch(`http://localhost:7070/user/${id}`, {
               method: "GET",
               headers: {
                 "Content-Type": "application/json",
@@ -98,7 +98,7 @@ function ManageAppointments() {
     }
 
     try {
-      const res = await fetch(`http://localhost:7000/appointment/${id}`, {
+      const res = await fetch(`http://localhost:7070/appointment/${id}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",

@@ -24,7 +24,7 @@ function PatientApp() {
       }
 
       try {
-        const res = await fetch("http://localhost:7000/appointment/patient", {
+        const res = await fetch("http://localhost:7070/appointment/patient", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -65,7 +65,7 @@ function PatientApp() {
 
     try {
       // FIX: Fetch a specific appointment by ID
-      const res = await fetch(`http://localhost:7000/appointment/${id}`, {
+      const res = await fetch(`http://localhost:7070/appointment/${id}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",

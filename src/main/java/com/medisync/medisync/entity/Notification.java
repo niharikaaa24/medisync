@@ -1,48 +1,31 @@
 package com.medisync.medisync.entity;
 
+import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 
-
 @Document(collection = "notifications")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Notification {
 
     @Id
     private String id;
 
-    private String userId;
+    @NotBlank
+    private String recipientId; // Store the stable MongoDB ID of the user
+
+    @NotBlank
     private String message;
 
     private LocalDateTime timestamp;
-
-    public Notification()
-    {
-        this.timestamp= LocalDateTime.now();
-    }
-
-    public String getUserId() {
-        return userId;
-    }
-
-    public void setUserId(String userId) {
-        this.userId = userId;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public void setMessage(String message) {
-        this.message = message;
-    }
-
-    public LocalDateTime getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(LocalDateTime timestamp) {
-        this.timestamp = timestamp;
-    }
+    private boolean isRead;
 }

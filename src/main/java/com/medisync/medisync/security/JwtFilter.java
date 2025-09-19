@@ -21,6 +21,9 @@ public class JwtFilter extends OncePerRequestFilter {
     @Autowired
     private CustomUserDetailsServiceImp userDetailsService;
 
+    public JwtFilter(JwtUtil jwtUtil, CustomUserDetailsServiceImp userDetailsService) {
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -31,8 +34,8 @@ public class JwtFilter extends OncePerRequestFilter {
         String jwtToken = null;
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            jwtToken = authHeader.substring(7); // Extract the token (remove "Bearer ")
-            username = jwtUtil.extractUsername(jwtToken); // Extract username from the token
+            jwtToken = authHeader.substring(7);
+            username = jwtUtil.extractUsername(jwtToken);
         }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {

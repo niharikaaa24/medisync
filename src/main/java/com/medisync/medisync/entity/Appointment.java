@@ -2,15 +2,15 @@ package com.medisync.medisync.entity;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern; // Needed for @Pattern annotation
-import lombok.Data; // For @Data annotation (getters, setters, etc.)
+import jakarta.validation.constraints.Pattern;
+import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
-
+import java.io.Serializable;
 
 @Document(collection = "appointments")
 @Data
-public class Appointment {
+public class Appointment implements Serializable  {
 
     @Id
     private String id;

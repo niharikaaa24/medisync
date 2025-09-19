@@ -30,20 +30,22 @@ public class NotificationController {
         return ResponseEntity.ok(notification);
     }
 
+
     @CrossOrigin(origins = "http://localhost:3000")
     @GetMapping("/my")
     public ResponseEntity<List<Notification>> getMyNotifications() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
-        String username;
+        String userId;
         if (auth.getPrincipal() instanceof CustomUserDetails) {
-            username = ((CustomUserDetails) auth.getPrincipal()).getUsername();
-
+            // Correctly get the user's MongoDB ID from CustomUserDetails
+            userId = ((CustomUserDetails) auth.getPrincipal()).getId();
         } else {
             throw new RuntimeException("Invalid user authentication");
         }
 
-        List<Notification> notifications = notificationService.getNotificationsForUser(username);
+        // Now, call the service with the correct userId
+        List<Notification> notifications = notificationService.getNotificationsForUser(userId);
         return ResponseEntity.ok(notifications);
     }
 }

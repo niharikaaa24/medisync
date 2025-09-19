@@ -13,7 +13,7 @@ function HomePage() {
     console.log("Login function triggered");
 
     try {
-      const res = await fetch("http://localhost:7000/auth/login", {
+      const res = await fetch("http://localhost:7070/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
@@ -60,7 +60,7 @@ function HomePage() {
     console.log("Signup function triggered");
 
     try {
-      const res = await fetch("http://localhost:7000/auth/signup", {
+      const res = await fetch("http://localhost:7070/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password, phoneNumber, role }),

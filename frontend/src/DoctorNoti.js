@@ -7,6 +7,9 @@ function DoctorNoti() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // New state variable to trigger a re-fetch
+  const [refreshNotifications, setRefreshNotifications] = useState(false);
+
   useEffect(() => {
     const fetchNotifications = async () => {
       setLoading(true);
@@ -20,7 +23,7 @@ function DoctorNoti() {
       }
 
       try {
-        const res = await fetch("http://localhost:7000/notification/my", {
+        const res = await fetch("http://localhost:7070/notification/my", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -34,7 +37,7 @@ function DoctorNoti() {
         }
 
         const data = await res.json();
-        setNotifications(data); // Assuming data is an array of notification objects
+        setNotifications(data);
       } catch (err) {
         console.error("Error fetching notifications:", err);
         setError(err.message);
@@ -45,13 +48,17 @@ function DoctorNoti() {
     };
 
     fetchNotifications();
-  }, [navigate]); // navigate is a dependency
+  }, [navigate, refreshNotifications]); // Add refreshNotifications to the dependency array
 
-  // Optional: Function to format timestamp for better readability
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return "N/A";
     const date = new Date(timestamp);
-    return date.toLocaleString(); // Adjust format as needed
+    return date.toLocaleString();
+  };
+
+  // New function to handle the manual refresh
+  const handleRefresh = () => {
+    setRefreshNotifications(prev => !prev);
   };
 
   if (loading) {
@@ -76,9 +83,14 @@ function DoctorNoti() {
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>Your Notifications</h1>
-      <button onClick={() => navigate("/doctor/home")} style={styles.backButton}>
-        ← Back to Dashboard
-      </button>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button onClick={() => navigate("/doctor/home")} style={styles.backButton}>
+          ← Back to Dashboard
+        </button>
+        <button onClick={handleRefresh} style={styles.refreshButton}>
+          Refresh Notifications
+        </button>
+      </div>
 
       {notifications.length === 0 ? (
         <p style={styles.noNotifications}>You have no new notifications.</p>
@@ -90,7 +102,6 @@ function DoctorNoti() {
               <p style={styles.notificationTimestamp}>
                 Received: {formatTimestamp(notification.timestamp)}
               </p>
-              {/* You might add a "Mark as Read" button here */}
             </div>
           ))}
         </div>
@@ -103,7 +114,7 @@ const styles = {
   container: {
     padding: "40px",
     fontFamily: "Arial, sans-serif",
-    backgroundColor: "#E3F2FD", // Light blue background for doctors
+    backgroundColor: "#E3F2FD",
     minHeight: "100vh",
     display: "flex",
     flexDirection: "column",
@@ -113,11 +124,11 @@ const styles = {
   title: {
     fontSize: "2.5rem",
     marginBottom: "20px",
-    color: "#1976D2", // Deep blue
+    color: "#1976D2",
     textAlign: "center",
   },
   backButton: {
-    backgroundColor: "#2196F3", // Blue
+    backgroundColor: "#2196F3",
     color: "white",
     padding: "10px 20px",
     borderRadius: "8px",
@@ -126,32 +137,38 @@ const styles = {
     fontSize: "1rem",
     marginBottom: "20px",
     transition: "background-color 0.2s ease",
-    "&:hover": {
-      backgroundColor: "#1976D2",
-    },
+  },
+  refreshButton: {
+    backgroundColor: "#4CAF50", // Green for refresh
+    color: "white",
+    padding: "10px 20px",
+    borderRadius: "8px",
+    border: "none",
+    cursor: "pointer",
+    fontSize: "1rem",
+    marginBottom: "20px",
+    transition: "background-color 0.2s ease",
   },
   notificationsList: {
     width: "100%",
-    maxWidth: "600px", // Keep a max-width for better readability on large screens
+    maxWidth: "600px",
     display: "flex",
     flexDirection: "column",
     gap: "15px",
   },
   notificationCard: {
-    background: "#FFFFFF", // White card
+    background: "#FFFFFF",
     padding: "20px",
     borderRadius: "10px",
     boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
-    borderLeft: "5px solid #2196F3", // Blue border for emphasis
+    borderLeft: "5px solid #2196F3",
   },
   notificationMessage: {
     fontSize: "1.1rem",
     color: "#333",
     marginBottom: "10px",
-    // --- FIX FOR TEXT OVERFLOW ---
-    wordBreak: "break-word",   // Breaks words at arbitrary points if necessary
-    overflowWrap: "break-word", // Breaks words if they are too long to fit
-    // --- END FIX ---
+    wordBreak: "break-word",
+    overflowWrap: "break-word",
   },
   notificationTimestamp: {
     fontSize: "0.9rem",

@@ -6,15 +6,6 @@ function PatientHome() {
 
   return (
     <div style={styles.container}>
-      <button
-        style={styles.notificationBtn}
-        onClick={() => navigate("/patient-notifications")}
-        onMouseEnter={(e) => (e.target.style.backgroundColor = "#43A047")}
-        onMouseLeave={(e) => (e.target.style.backgroundColor = "#66BB6A")}
-      >
-        🔔
-      </button>
-
       <h1 style={styles.title}>Patient Dashboard</h1>
       <p style={styles.subtitle}>
         Welcome! Here’s your personalized health hub.
@@ -66,20 +57,6 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
-  },
-  notificationBtn: {
-    position: "absolute",
-    top: "20px",
-    right: "20px",
-    backgroundColor: "#66BB6A", // Softer green
-    border: "none",
-    padding: "10px 14px",
-    borderRadius: "50%",
-    cursor: "pointer",
-    fontSize: "1.2rem",
-    color: "#fff",
-    boxShadow: "0 4px 10px rgba(76, 175, 80, 0.3)",
-    transition: "background-color 0.2s ease-in-out",
   },
   title: {
     fontSize: "2.5rem",

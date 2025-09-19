@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
 
 function PatientNoti() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // This state variable will trigger a re-fetch when its value changes
+  const [refreshNotifications, setRefreshNotifications] = useState(false);
 
   useEffect(() => {
     const fetchNotifications = async () => {
@@ -20,7 +24,7 @@ function PatientNoti() {
       }
 
       try {
-        const res = await fetch("http://localhost:7000/notification/my", {
+        const res = await fetch("http://localhost:7070/notification/my", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -34,7 +38,7 @@ function PatientNoti() {
         }
 
         const data = await res.json();
-        setNotifications(data); // Assuming data is an array of notification objects
+        setNotifications(data);
       } catch (err) {
         console.error("Error fetching notifications:", err);
         setError(err.message);
@@ -45,12 +49,17 @@ function PatientNoti() {
     };
 
     fetchNotifications();
-  }, [navigate]);
+  }, [navigate, refreshNotifications]); // Now, this effect will re-run whenever refreshNotifications changes
 
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return "N/A";
     const date = new Date(timestamp);
     return date.toLocaleString();
+  };
+
+  // This function will be called to trigger a re-fetch of notifications
+  const handleRefresh = () => {
+    setRefreshNotifications(prev => !prev);
   };
 
   if (loading) {
@@ -75,9 +84,14 @@ function PatientNoti() {
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>Your Notifications</h1>
-      <button onClick={() => navigate("/patient/home")} style={styles.backButton}>
-        ← Back to Dashboard
-      </button>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button onClick={() => navigate("/patient/home")} style={styles.backButton}>
+          ← Back to Dashboard
+        </button>
+        <button onClick={handleRefresh} style={styles.refreshButton}>
+          Refresh Notifications
+        </button>
+      </div>
 
       {notifications.length === 0 ? (
         <p style={styles.noNotifications}>You have no new notifications.</p>
@@ -110,11 +124,11 @@ const styles = {
   title: {
     fontSize: "2.5rem",
     marginBottom: "20px",
-    color: "#1976D2", // Deep blue
+    color: "#1976D2",
     textAlign: "center",
   },
   backButton: {
-    backgroundColor: "#2196F3", // Blue
+    backgroundColor: "#2196F3",
     color: "white",
     padding: "10px 20px",
     borderRadius: "8px",
@@ -123,19 +137,27 @@ const styles = {
     fontSize: "1rem",
     marginBottom: "20px",
     transition: "background-color 0.2s ease",
-    "&:hover": {
-      backgroundColor: "#1976D2",
-    },
+  },
+  refreshButton: {
+    backgroundColor: "#4CAF50", // Green for refresh
+    color: "white",
+    padding: "10px 20px",
+    borderRadius: "8px",
+    border: "none",
+    cursor: "pointer",
+    fontSize: "1rem",
+    marginBottom: "20px",
+    transition: "background-color 0.2s ease",
   },
   notificationsList: {
     width: "100%",
-    maxWidth: "600px", // Keep a max-width for better readability on large screens
+    maxWidth: "600px",
     display: "flex",
     flexDirection: "column",
     gap: "15px",
   },
   notificationCard: {
-    background: "#FFFFFF", // White card
+    background: "#FFFFFF",
     padding: "20px",
     borderRadius: "10px",
     boxShadow: "0 4px 10px rgba(0,0,0,0.1)",

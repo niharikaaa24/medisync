@@ -1,6 +1,4 @@
-
 package com.medisync.medisync.controller;
-
 import com.medisync.medisync.entity.User;
 import com.medisync.medisync.service.UserService;
 import jakarta.validation.Valid;
@@ -13,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 
 @RestController
@@ -25,14 +24,14 @@ public class UserController {
 
     @CrossOrigin(origins = "http://localhost:3000")
     @GetMapping("/all")
-    public ResponseEntity getusers() {
+    public ResponseEntity<List<User>> getusers() {
         List<User> users= userService.findAllUsers();
 
-        if(users!=null) {
-            return new ResponseEntity<>(users, HttpStatus.ACCEPTED);
+        if (users != null) {
+            return new ResponseEntity<>(users, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
-        else
-            return new ResponseEntity(HttpStatus.NOT_FOUND);
     }
 
 
@@ -63,6 +62,9 @@ public class UserController {
     @GetMapping("/username/{username}")
     public ResponseEntity<?> getUserByUsername(@PathVariable String username) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (!authentication.isAuthenticated()) {
+            return new ResponseEntity<>("User not authenticated", HttpStatus.UNAUTHORIZED);
+        }
         String currentUsername = authentication.getName();
         boolean isAdmin = authentication.getAuthorities().stream()
                 .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
@@ -80,6 +82,20 @@ public class UserController {
         }
 
         return new ResponseEntity<>("Access denied: You can only view your own profile or must be an admin.", HttpStatus.FORBIDDEN);
+    }
+
+    @CrossOrigin(origins = "http://localhost:3000")
+    @GetMapping("/doctors")
+    public ResponseEntity<List<User>> getDoctors() {
+        List<User> allUsers = userService.findAllUsers();
+        List<User> doctors = allUsers.stream()
+                .filter(user -> user.getRole() != null && user.getRole().name().equals("DOCTOR")) // Assuming role enum is "DOCTOR" (not "ROLE_DOCTOR")
+                .collect(Collectors.toList());
+        if (!doctors.isEmpty()) {
+            return new ResponseEntity<>(doctors, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.OK);
+        }
     }
 
 

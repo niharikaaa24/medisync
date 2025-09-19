@@ -10,6 +10,7 @@ import BookApp from "./BookApp";
 import DoctorNoti from "./DoctorNoti";
 import DoctorApp from "./DoctorApp";
 import PatientNoti from "./PatientNoti";
+
 function App() {
   return (
     <Routes>

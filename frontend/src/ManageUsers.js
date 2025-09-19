@@ -32,7 +32,7 @@ function ManageUsers() {
     }
 
     try {
-      const res = await fetch("http://localhost:7000/user/all", {
+      const res = await fetch("http://localhost:7070/user/all", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -89,7 +89,7 @@ function ManageUsers() {
     }
 
     try {
-      const res = await fetch(`http://localhost:7000/user/${editingUser.id}`, {
+      const res = await fetch(`http://localhost:7070/user/${editingUser.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -126,7 +126,7 @@ function ManageUsers() {
     }
 
     try {
-      const res = await fetch(`http://localhost:7000/user/${id}`, {
+      const res = await fetch(`http://localhost:7070/user/${id}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",

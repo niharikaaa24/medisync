@@ -6,13 +6,6 @@ function DoctorHome() {
 
   return (
     <div style={styles.container}>
-      <button
-        style={styles.notificationBtn}
-        onClick={() => navigate("/doctor/notifications")}
-      >
-        🔔
-      </button>
-
       <h1 style={styles.title}>Doctor Dashboard</h1>
       <p style={styles.subtitle}>
         Manage appointments and patient health records.
@@ -38,19 +31,6 @@ const styles = {
     minHeight: "100vh",
     color: "#2F4F4F",
     position: "relative",
-  },
-  notificationBtn: {
-    position: "absolute",
-    top: "20px",
-    right: "20px",
-    backgroundColor: "#A5D6A7", // light green
-    border: "none",
-    borderRadius: "50%",
-    padding: "10px 14px",
-    fontSize: "1.2rem",
-    cursor: "pointer",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-    transition: "background-color 0.2s ease",
   },
   title: {
     fontSize: "2.5rem",

@@ -1,23 +1,26 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { jwtDecode } from "jwt-decode"; // To decode JWT for username
+import { jwtDecode } from "jwt-decode";
 
 function BookAppointment() {
   const navigate = useNavigate();
-  const [patientId, setPatientId] = useState(""); // This will be set from the fetched user details
+  const [patientId, setPatientId] = useState("");
   const [doctorId, setDoctorId] = useState("");
   const [reason, setReason] = useState("");
   const [appointmentDate, setAppointmentDate] = useState("");
   const [appointmentTime, setAppointmentTime] = useState("");
-  const [doctors, setDoctors] = useState([]); // To fetch and list available doctors
-  const [loading, setLoading] = useState(true); // Loading state for data fetching
-  const [error, setError] = useState(null); // Error state for data fetching
+  const [doctors, setDoctors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [amount, setAmount] = useState(1000); // Default amount, e.g., 10.00 USD
+  const [currency, setCurrency] = useState("INR"); // Default currency
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
     if (!token) {
       alert("You are not logged in. Please log in to book an appointment.");
-      navigate("/login"); // Redirect if no token
+      navigate("/login");
       return;
     }
 
@@ -26,15 +29,13 @@ function BookAppointment() {
       setError(null);
       try {
         const decoded = jwtDecode(token);
-        const username = decoded.sub; // Correctly get username from JWT
+        const username = decoded.sub;
 
-        // 1. Fetch current user's details to get their MongoDB _id
-        // Using the correct endpoint and 'username' variable
-        const userRes = await fetch(`http://localhost:7000/user/username/${username}`, {
+        const userRes = await fetch(`http://localhost:7070/user/username/${username}`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`, // Send JWT for authentication
+            "Authorization": `Bearer ${token}`,
           },
         });
 
@@ -43,14 +44,13 @@ function BookAppointment() {
           throw new Error(`Failed to fetch current user details: ${userRes.status} - ${errorText}`);
         }
         const userData = await userRes.json();
-        setPatientId(userData.id); // Set the patient's MongoDB '_id' from the response
+        setPatientId(userData.id);
 
-        // 2. Fetch list of all users and filter for doctors
-        const doctorsRes = await fetch("http://localhost:7000/user/all", {
+        const doctorsRes = await fetch("http://localhost:7070/user/doctors", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`, // Send JWT for authentication
+            "Authorization": `Bearer ${token}`,
           },
         });
 
@@ -58,27 +58,25 @@ function BookAppointment() {
           const errorText = await doctorsRes.text();
           throw new Error(`Failed to fetch doctors list: ${doctorsRes.status} - ${errorText}`);
         }
-        const allUsers = await doctorsRes.json();
-        // Filter for users with 'DOCTOR' role (ensure this matches your Java enum value exactly, e.g., "DOCTOR" not "ROLE_DOCTOR")
-        const doctorList = allUsers.filter(user => user.role === "DOCTOR");
+        const doctorList = await doctorsRes.json();
         setDoctors(doctorList);
 
       } catch (err) {
         console.error("Error during initial data fetch:", err);
         setError(err.message);
         alert("Failed to load necessary data for booking: " + err.message + ". Please try again or log in.");
-        navigate("/patient/home"); // Go back if initial fetch fails
+        navigate("/patient/home");
       } finally {
         setLoading(false);
       }
+
     };
 
     fetchData();
-  }, [navigate]); // navigate is a dependency of useEffect
+  }, [navigate]);
 
   const handleBookAppointment = async () => {
-    // Basic client-side validation
-    if (!patientId || !doctorId || !reason || !appointmentDate || !appointmentTime) {
+    if (!patientId || !doctorId || !reason || !appointmentDate || !appointmentTime || !amount || !currency) {
       alert("Please fill in all fields before booking the appointment.");
       return;
     }
@@ -90,34 +88,49 @@ function BookAppointment() {
       return;
     }
 
-    // Construct the appointment object, ensuring date and time formats match backend's @Pattern
     const newAppointment = {
       patientId,
       doctorId,
       reason,
-      appointmentDate, // Format: YYYY-MM-DD (e.g., "2025-08-15")
-      appointmentTime, // Format: HH:MM (e.g., "14:30")
-      status: "PENDING", // Default status for a newly booked appointment
+      appointmentDate,
+      appointmentTime,
+      status: "PENDING",
+      amount: parseFloat(amount),
+      currency: currency,
+
+      // Add these required fields that were missing
+      name: "Telehealth Consultation",
+      successUrl: "http://localhost:3000/payment-success",
+      cancelUrl: "http://localhost:3000/appointments",
+
+      // Set appointmentId to null or a placeholder if it's generated by the backend
+      appointmentId: null,
     };
 
     try {
-      // Send the POST request to your backend to create the appointment
-      const res = await fetch("http://localhost:7000/appointment", {
+      const res = await fetch("http://localhost:7070/appointment", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`, // Include the JWT token in the Authorization header
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify(newAppointment),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const errorData = await res.json(); // Attempt to read specific error messages from backend
-        throw new Error(errorData.message || "Failed to book appointment. Please check your inputs.");
+        throw new Error(data.message || "Failed to book appointment.");
       }
 
-      alert("Appointment booked successfully! You will receive a notification shortly.");
-      navigate("/appointments"); // Redirect to the appointments list page after successful booking
+      if (data.sessionUrl) {
+        alert("Redirecting to payment gateway...");
+        window.location.href = data.sessionUrl;
+      } else {
+        alert(data.message || "Appointment booked successfully! You will receive a notification shortly.");
+        navigate("/appointments");
+      }
+
     } catch (err) {
       console.error("Error booking appointment:", err);
       alert("Error booking appointment: " + err.message);
@@ -203,6 +216,30 @@ function BookAppointment() {
             required
           />
         </label>
+
+        <h3 style={styles.formTitle}>Payment Details</h3>
+        <label style={styles.label}>
+          Amount:
+          <input
+            type="number"
+            style={styles.input}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+            min="1"
+          />
+        </label>
+        <label style={styles.label}>
+          Currency:
+          <input
+            type="text"
+            style={styles.input}
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+            required
+          />
+        </label>
+
 
         <button onClick={handleBookAppointment} style={styles.button}>
           Book Appointment
